@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import React, { useEffect, useRef, useState } from 'react';
@@ -21,8 +22,7 @@ export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [updatingTodoId, setUpdatingTodoId] = useState<number | null>(null);
-  const [allTodos, setAllTodos] = useState<Todo[]>([]);
-  const [activeFilter, setActivefilter] = useState<FilterType>(FilterType.All);
+  const [activeFilter, setActiveFilter] = useState<FilterType>(FilterType.All);
   const [title, setTitle] = useState<string>('');
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const [disabled, setDisabled] = useState(false);
@@ -37,18 +37,20 @@ export const App: React.FC = () => {
   }, [errorMessage]);
 
   useEffect(() => {
+    setTimeout(() => {
+      setErrorMessage('');
+    }, 3000);
+  }, [errorMessage]);
+
+  useEffect(() => {
     getTodos()
       .then(todosFromServer => {
         setTodos(todosFromServer);
-        setAllTodos(todosFromServer);
         setErrorMessage('');
         inputRef.current?.focus();
       })
       .catch(() => {
         setErrorMessage('Unable to load todos');
-        setTimeout(() => {
-          setErrorMessage('');
-        }, 3000);
       });
   }, []);
 
@@ -67,11 +69,6 @@ export const App: React.FC = () => {
           todo.id === id ? { ...todo, completed: !todo.completed } : todo,
         ),
       );
-      setAllTodos(prevTodos =>
-        (prevTodos as Todo[]).map(todo =>
-          todo.id === id ? { ...todo, completed: !todo.completed } : todo,
-        ),
-      );
     } catch {
       setErrorMessage('Unable to update a todo');
     } finally {
@@ -79,44 +76,38 @@ export const App: React.FC = () => {
     }
   };
 
+  const changeFilter = (filterType: FilterType) => {
+    setActiveFilter(filterType);
+  };
+
   const handleFilter = (filterType: FilterType) => {
-    let filteredTodos;
-
-    setActivefilter(filterType);
-
     switch (filterType) {
       case FilterType.All: {
-        filteredTodos = allTodos;
-        break;
+        return todos;
       }
 
       case FilterType.Active: {
-        filteredTodos = allTodos?.filter(todo => !todo.completed);
-        break;
+        return todos.filter(todo => !todo.completed);
       }
 
       case FilterType.Completed: {
-        filteredTodos = allTodos?.filter(todo => todo.completed);
-        break;
+        return todos?.filter(todo => todo.completed);
       }
 
       default: {
-        filteredTodos = allTodos;
+        return todos;
       }
     }
-
-    if (filteredTodos) {
-      setTodos(filteredTodos);
-    }
   };
+
+  const filteredTodos = handleFilter(activeFilter);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (title.trim().length === 0) {
       setErrorMessage('Title should not be empty');
-      setTimeout(() => {
-        setErrorMessage('');
-      }, 3000);
+
+      return;
     }
 
     try {
@@ -128,14 +119,10 @@ export const App: React.FC = () => {
         completed: false,
       });
 
-      setAllTodos(prevTodos => [...prevTodos, newTodo]);
       setTodos(prevTodos => [...prevTodos, newTodo]);
       setTitle('');
     } catch {
       setErrorMessage('Unable to add a todo');
-      setTimeout(() => {
-        setErrorMessage('');
-      }, 3000);
     } finally {
       setTempTodo(null);
       setDisabled(false);
@@ -150,12 +137,9 @@ export const App: React.FC = () => {
     try {
       await deleteTodo(id);
       setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
-      setAllTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
+
     } catch {
       setErrorMessage('Unable to delete a todo');
-      setTimeout(() => {
-        setErrorMessage('');
-      }, 3000);
     } finally {
       setDeletingTodoIds(prevIds => prevIds.filter(prevId => prevId !== id));
       setTimeout(() => {
@@ -165,24 +149,34 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteCompleted = async () => {
-    const completedTodos = allTodos.filter(todo => todo.completed);
+    const completedTodos = todos.filter(todo => todo.completed);
     const completedIds = completedTodos.map(todo => todo.id);
+
 
     setDeletingTodoIds(prevIds => [...prevIds, ...completedIds]);
 
     const results = await Promise.allSettled(
-      completedIds.map(id => handleDelete(id)),
+      completedIds.map(async id => {
+        await handleDelete(id);
+      })
+    );
+
+    setTodos(prevTodos =>
+      prevTodos.filter(prevTodo => {
+        const index = completedIds.indexOf(prevTodo.id);
+
+        if (index === -1) {
+          return true;
+        }
+        
+        const result = results[index];
+
+        return !(prevTodo.completed && result.status === 'fulfilled');
+      }),
     );
 
     setDeletingTodoIds(prevIds =>
-      prevIds.filter(id => !completedIds.includes(id)),
-    );
-
-    setAllTodos(prevTodos =>
-      prevTodos.filter((todo, index) =>
-        results[index].status === 'fulfilled' ? !todo.completed : true,
-      ),
-    );
+      prevIds.filter(id => !completedIds.includes(id)));
   };
 
   if (!USER_ID) {
@@ -195,7 +189,7 @@ export const App: React.FC = () => {
 
       <div className="todoapp__content">
         <Header
-          todos={todos}
+          todos={filteredTodos}
           inputRef={inputRef}
           handleSubmit={handleSubmit}
           title={title}
@@ -203,7 +197,7 @@ export const App: React.FC = () => {
           disabled={disabled}
         />
         <TodoList
-          todos={todos}
+          todos={filteredTodos}
           toggleTodo={toggleTodo}
           updatingTodoId={updatingTodoId}
           handleDelete={handleDelete}
@@ -212,13 +206,13 @@ export const App: React.FC = () => {
         {tempTodo && <TodoItem todo={tempTodo} />}
 
         {/* Hide the footer if there are no todos */}
-        {(allTodos ?? []).length > 0 && (
+        {(todos ?? []).length > 0 && (
           <Footer
-            allTodos={allTodos}
-            activeFilter={activeFilter}
-            handleFilter={handleFilter}
             todos={todos}
+            activeFilter={activeFilter}
+            handleFilter={changeFilter}
             handleDeleteCompleted={handleDeleteCompleted}
+            filteredTodos={filteredTodos}
           />
         )}
       </div>

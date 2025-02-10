@@ -4,25 +4,25 @@ import { FilterType } from '../types/FilterType';
 import { Todo } from '../types/Todo';
 
 type Props = {
-  allTodos: Todo[] | null;
   activeFilter: FilterType;
   handleFilter: (filter: FilterType) => void;
   todos: Todo[] | null;
+  filteredTodos: Todo[];
   handleDeleteCompleted: () => void;
 };
 
 export const Footer: React.FC<Props> = ({
-  allTodos,
   activeFilter,
   handleFilter,
   todos,
+  filteredTodos,
   handleDeleteCompleted,
 }) => {
   return (
     <>
       <footer className="todoapp__footer" data-cy="Footer">
         <span className="todo-count" data-cy="TodosCounter">
-          {(allTodos ?? []).filter(todo => !todo.completed).length} items left
+          {(todos ?? []).filter(todo => !todo.completed).length} items left
         </span>
 
         {/* Active link should have the 'selected' class */}
@@ -67,7 +67,9 @@ export const Footer: React.FC<Props> = ({
           className="todoapp__clear-completed"
           data-cy="ClearCompletedButton"
           onClick={handleDeleteCompleted}
-          disabled={(todos ?? []).filter(todo => todo.completed).length === 0}
+          disabled={
+            (filteredTodos ?? []).filter(todo => todo.completed).length === 0
+          }
         >
           Clear completed
         </button>
