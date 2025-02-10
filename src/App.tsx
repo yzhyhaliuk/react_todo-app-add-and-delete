@@ -152,31 +152,15 @@ export const App: React.FC = () => {
     const completedTodos = todos.filter(todo => todo.completed);
     const completedIds = completedTodos.map(todo => todo.id);
 
-
     setDeletingTodoIds(prevIds => [...prevIds, ...completedIds]);
 
-    const results = await Promise.allSettled(
-      completedIds.map(async id => {
-        await handleDelete(id);
-      })
-    );
-
-    setTodos(prevTodos =>
-      prevTodos.filter(prevTodo => {
-        const index = completedIds.indexOf(prevTodo.id);
-
-        if (index === -1) {
-          return true;
-        }
-        
-        const result = results[index];
-
-        return !(prevTodo.completed && result.status === 'fulfilled');
-      }),
-    );
+    for (const id of completedIds) {
+      await handleDelete(id);
+    }
 
     setDeletingTodoIds(prevIds =>
-      prevIds.filter(id => !completedIds.includes(id)));
+      prevIds.filter(id => !completedIds.includes(id))
+    );
   };
 
   if (!USER_ID) {
